@@ -1,0 +1,281 @@
+// Mochiverse Dodge - p5.js Implementation
+// February 20, 2025
+
+let faceX, faceY; // Player position
+let kebabs = []; // Array for kebab objects
+let mochis = []; // Array for mochi objects
+let score = 0;
+let lives = 3;
+let gameState = "menu"; // "menu", "playing", "gameOver"
+let frame = 0; // Frame counter for animations
+
+// Particle system for mochi collection
+let particles = [];
+
+function setup() {
+  createCanvas(800, 600);
+  faceX = width / 2;
+  faceY = height / 2;
+  textFont("Arial"); // Clean, sans-serif font for UI
+}
+
+function draw() {
+  // Sunset-inspired background with gradient
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let r = lerp(255, 165, inter); // Orange to pink
+    let g = lerp(165, 105, inter);
+    let b = lerp(0, 180, inter);
+    stroke(r, g, b);
+    line(0, y, width, y);
+  }
+  
+  // Add subtle clouds or buildings in the background
+  fill(220, 220, 220, 50); // Light gray, semi-transparent
+  ellipse(width * 0.2, height * 0.3, 150, 60); // Cloud 1
+  ellipse(width * 0.7, height * 0.2, 200, 80); // Cloud 2
+
+  if (gameState === "menu") {
+    drawMenu();
+  } else if (gameState === "playing") {
+    updateGame();
+    drawGame();
+  } else if (gameState === "gameOver") {
+    drawGameOver();
+  }
+
+  // Update and draw particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+    if (particles[i].alpha <= 0) particles.splice(i, 1);
+  }
+
+  frame++; // Increment frame for animations
+}
+
+function drawFace(x, y) {
+  // Realistic giant face based on the provided image
+  // Head: Rosy complexion with soft shading
+  let skinColor = color(255, 220, 200); // Light peach
+  fill(skinColor);
+  noStroke();
+  ellipse(x, y, 150, 180); // Head shape
+
+  // Hair: Brown with bangs, flowing slightly
+  fill(139, 69, 19); // Dark brown
+  beginShape();
+  vertex(x - 75, y - 90); // Left side of hair
+  bezierVertex(x - 80, y - 110, x - 60, y - 120, x, y - 100); // Bang curve
+  bezierVertex(x + 60, y - 120, x + 80, y - 110, x + 75, y - 90); // Right side
+  vertex(x + 75, y + 60); // Hair extends down
+  vertex(x - 75, y + 60);
+  endShape(CLOSE);
+  
+  // Eyes: Large, expressive brown with highlights
+  fill(139, 69, 19); // Brown iris
+  ellipse(x - 30, y - 20, 30, 30); // Left eye
+  ellipse(x + 30, y - 20, 30, 30); // Right eye
+  fill(0); // Pupil
+  ellipse(x - 30, y - 20, 10, 10);
+  ellipse(x + 30, y - 20, 10, 10);
+  fill(255); // Highlight
+  ellipse(x - 35, y - 25, 5, 5);
+  ellipse(x + 25, y - 25, 5, 5);
+
+  // Eye blinking animation (every 60 frames)
+  if (frame % 60 < 10) {
+    fill(skinColor);
+    rect(x - 40, y - 20, 80, 5); // Blinking eyelids
+  }
+
+  // Lips: Soft pink, slightly smiling
+  fill(255, 105, 180); // Pink
+  arc(x, y + 20, 50, 30, 0, PI, CHORD); // Smile shape
+
+  // Shirt: Light blue, visible at bottom
+  fill(173, 216, 230); // Light blue
+  rect(x - 75, y + 60, 150, 60, 20); // Rounded bottom
+}
+
+function drawKebab(x, y) {
+  // Realistic kebab with meat, veggies, and skewer
+  push(); // Save transformation state
+  translate(x, y);
+  rotate(sin(frame * 0.05) * 0.1); // Slight wobble for realism
+
+  // Skewer: Wooden brown line
+  stroke(139, 69, 19); // Dark brown
+  strokeWeight(5);
+  line(0, 0, 0, 50);
+  noStroke();
+
+  // Meat chunks: Tan/brown with gradient
+  fill(210, 105, 30); // Tan
+  rect(-15, 10, 30, 20, 5); // First meat chunk
+  fill(139, 69, 19); // Darker brown for shadow
+  rect(-15, 15, 30, 10, 5);
+
+  // Vegetables: Bell peppers (red), onions (white)
+  fill(255, 0, 0); // Red pepper
+  rect(-15, 35, 30, 10, 5);
+  fill(255); // White onion
+  rect(-15, 45, 30, 10, 5);
+
+  pop(); // Restore transformation state
+}
+
+function drawMochi(x, y) {
+  // Realistic mochi with glossy texture
+  push();
+  translate(x, y);
+  rotate(cos(frame * 0.05) * 0.1); // Gentle bobbing
+
+  // Base mochi: Pink with gradient
+  let pink = color(255, 182, 193); // Light pink
+  let darkPink = color(255, 105, 180); // Darker pink
+  for (let i = 0; i < 30; i++) {
+    let inter = map(i, 0, 30, 0, 1);
+    fill(lerpColor(pink, darkPink, inter));
+    ellipse(0, 0, 30 - i * 0.5, 30 - i * 0.5);
+  }
+
+  // Glossy highlight
+  fill(255, 255, 255, 150); // Semi-transparent white
+  ellipse(-5, -5, 10, 10);
+
+  // Subtle texture: Small indentations
+  stroke(255, 105, 180);
+  strokeWeight(1);
+  point(5, 5);
+  point(-5, 5);
+  noStroke();
+
+  pop();
+}
+
+function Particle(x, y) {
+  this.x = x;
+  this.y = y;
+  this.size = random(5, 10);
+  this.alpha = 255;
+  this.speedY = random(-2, -1);
+  this.speedX = random(-1, 1);
+
+  this.update = function() {
+    this.x += this.speedX;
+    this.y += this.speedY;
+    this.alpha -= 5;
+  };
+
+  this.draw = function() {
+    fill(255, 182, 193, this.alpha); // Pink particles
+    ellipse(this.x, this.y, this.size, this.size);
+  };
+}
+
+function updateGame() {
+  // Move player with arrow keys
+  let speed = 5;
+  if (keyIsDown(LEFT_ARROW)) faceX -= speed;
+  if (keyIsDown(RIGHT_ARROW)) faceX += speed;
+  if (keyIsDown(UP_ARROW)) faceY -= speed;
+  if (keyIsDown(DOWN_ARROW)) faceY += speed;
+  faceX = constrain(faceX, 75, width - 75); // Keep face on screen
+  faceY = constrain(faceY, 90, height - 90);
+
+  // Spawn kebabs and mochis (increase frequency with score)
+  let spawnRate = max(60 - score / 10, 20); // Faster spawning as score increases
+  if (frame % spawnRate === 0) {
+    kebabs.push({ 
+      x: random(width), 
+      y: -20, 
+      speed: random(2, 5 + score / 100) 
+    });
+    if (random(1) < 0.7) { // 70% chance for mochi
+      mochis.push({ 
+        x: random(width), 
+        y: -20, 
+        speed: random(2, 4 + score / 100) 
+      });
+    }
+  }
+
+  // Update and draw kebabs
+  for (let i = kebabs.length - 1; i >= 0; i--) {
+    kebabs[i].y += kebabs[i].speed;
+    kebabs[i].x += sin(frame * 0.05 + i) * 2; // Wobble side to side
+    drawKebab(kebabs[i].x, kebabs[i].y);
+    if (dist(faceX, faceY, kebabs[i].x, kebabs[i].y) < 80) {
+      lives--;
+      kebabs.splice(i, 1);
+      if (lives <= 0) gameState = "gameOver";
+    }
+    if (kebabs[i].y > height + 20) kebabs.splice(i, 1); // Remove off-screen
+  }
+
+  // Update and draw mochis
+  for (let i = mochis.length - 1; i >= 0; i--) {
+    mochis[i].y += mochis[i].speed;
+    mochis[i].x += cos(frame * 0.05 + i) * 2; // Gentle bobbing
+    drawMochi(mochis[i].x, mochis[i].y);
+    if (dist(faceX, faceY, mochis[i].x, mochis[i].y) < 80) {
+      score += 10;
+      mochis.splice(i, 1);
+      // Spawn particles for mochi collection
+      for (let j = 0; j < 10; j++) {
+        particles.push(new Particle(mochis[i].x, mochis[i].y));
+      }
+    }
+    if (mochis[i].y > height + 20) mochis.splice(i, 1); // Remove off-screen
+  }
+}
+
+function drawGame() {
+  drawFace(faceX, faceY);
+  
+  // Draw UI: Score and lives
+  fill(0);
+  textSize(20);
+  textAlign(LEFT, TOP);
+  text(`Score: ${score} | Lives: ${lives}`, 10, 10);
+}
+
+function drawMenu() {
+  fill(0);
+  textSize(40);
+  textAlign(CENTER, CENTER);
+  text("Mochiverse Dodge", width / 2, height / 2 - 50);
+  textSize(20);
+  text("Press Space to Start", width / 2, height / 2 + 20);
+}
+
+function drawGameOver() {
+  fill(0);
+  textSize(40);
+  textAlign(CENTER, CENTER);
+  text("Game Over", width / 2, height / 2 - 50);
+  textSize(20);
+  text(`Final Score: ${score}`, width / 2, height / 2);
+  text("Press Space to Restart", width / 2, height / 2 + 50);
+}
+
+function keyPressed() {
+  if (keyCode === 32) { // Spacebar
+    if (gameState === "menu") {
+      gameState = "playing";
+      score = 0;
+      lives = 3;
+      kebabs = [];
+      mochis = [];
+      particles = [];
+    } else if (gameState === "gameOver") {
+      gameState = "playing";
+      score = 0;
+      lives = 3;
+      kebabs = [];
+      mochis = [];
+      particles = [];
+    }
+  }
+}My p5.js game: Mochimania Dou
